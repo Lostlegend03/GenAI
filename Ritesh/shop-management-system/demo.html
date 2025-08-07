@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop Management System Demo</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+        h1 {
+            color: #1976d2;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+        .login-form {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        input, button {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #1976d2;
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 10px 20px;
+        }
+        button:hover {
+            background-color: #1565c0;
+        }
+        .dashboard-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #1976d2, #42a5f5);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .customers-table, .purchases-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .customers-table th, .customers-table td,
+        .purchases-table th, .purchases-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        .customers-table th, .purchases-table th {
+            background-color: #1976d2;
+            color: white;
+        }
+        .status-completed { color: #4caf50; font-weight: bold; }
+        .status-pending { color: #ff9800; font-weight: bold; }
+        .status-overdue { color: #f44336; font-weight: bold; }
+        .hidden { display: none; }
+        .error { color: #f44336; font-weight: bold; }
+        .success { color: #4caf50; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏪 Shop Management System Demo</h1>
+        <p><strong>Welcome to Ritesh Rajapati's Electronics Store</strong></p>
+        
+        <div class="section">
+            <h2>🔐 Login</h2>
+            <div class="login-form">
+                <input type="email" id="email" placeholder="Email" value="ritesh@shop.com">
+                <input type="password" id="password" placeholder="Password" value="password123">
+                <button onclick="login()">Login</button>
+            </div>
+            <div id="login-status"></div>
+        </div>
+
+        <div id="dashboard-section" class="section hidden">
+            <h2>📊 Dashboard Overview</h2>
+            <div class="dashboard-stats" id="dashboard-stats">
+                <!-- Stats will be loaded here -->
+            </div>
+        </div>
+
+        <div id="customers-section" class="section hidden">
+            <h2>👥 Customers</h2>
+            <button onclick="loadCustomers()">Refresh Customers</button>
+            <table class="customers-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Total Purchases</th>
+                        <th>Total Spent (₹)</th>
+                    </tr>
+                </thead>
+                <tbody id="customers-tbody">
+                    <!-- Customers will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+
+        <div id="purchases-section" class="section hidden">
+            <h2>🛒 Purchases</h2>
+            <button onclick="loadPurchases()">Refresh Purchases</button>
+            <table class="purchases-table">
+                <thead>
+                    <tr>
+                        <th>Customer</th>
+                        <th>Total Amount (₹)</th>
+                        <th>Paid Amount (₹)</th>
+                        <th>Remaining (₹)</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody id="purchases-tbody">
+                    <!-- Purchases will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        let authToken = '';
+
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const statusDiv = document.getElementById('login-status');
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    authToken = data.token;
+                    statusDiv.innerHTML = `<span class="success">✅ Login successful! Welcome ${data.data.user.name}</span>`;
+                    
+                    // Show dashboard sections
+                    document.getElementById('dashboard-section').classList.remove('hidden');
+                    document.getElementById('customers-section').classList.remove('hidden');
+                    document.getElementById('purchases-section').classList.remove('hidden');
+                    
+                    // Load data
+                    loadDashboard();
+                    loadCustomers();
+                    loadPurchases();
+                } else {
+                    statusDiv.innerHTML = `<span class="error">❌ ${data.message}</span>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+
+        async function loadDashboard() {
+            try {
+                const response = await fetch(`${API_BASE}/dashboard/overview`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+                const stats = data.data;
+
+                document.getElementById('dashboard-stats').innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-number">${stats.customers.total}</div>
+                        <div class="stat-label">Total Customers</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${stats.purchases.total}</div>
+                        <div class="stat-label">Total Purchases</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">₹${stats.revenue.total.toLocaleString()}</div>
+                        <div class="stat-label">Total Revenue</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${stats.revenue.collectionRate}%</div>
+                        <div class="stat-label">Collection Rate</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">₹${stats.payments.pending.amount.toLocaleString()}</div>
+                        <div class="stat-label">Pending Amount</div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        async function loadCustomers() {
+            try {
+                const response = await fetch(`${API_BASE}/customers`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+                const customers = data.data.customers;
+
+                const tbody = document.getElementById('customers-tbody');
+                tbody.innerHTML = customers.map(customer => `
+                    <tr>
+                        <td>${customer.name}</td>
+                        <td>${customer.email}</td>
+                        <td>${customer.phone}</td>
+                        <td>${customer.totalPurchases}</td>
+                        <td>₹${customer.totalSpent.toLocaleString()}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading customers:', error);
+            }
+        }
+
+        async function loadPurchases() {
+            try {
+                const response = await fetch(`${API_BASE}/purchases`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+                const purchases = data.data.purchases;
+
+                const tbody = document.getElementById('purchases-tbody');
+                tbody.innerHTML = purchases.map(purchase => `
+                    <tr>
+                        <td>${purchase.customer.name}</td>
+                        <td>₹${purchase.totalAmount.toLocaleString()}</td>
+                        <td>₹${purchase.paidAmount.toLocaleString()}</td>
+                        <td>₹${purchase.remainingAmount.toLocaleString()}</td>
+                        <td><span class="status-${purchase.paymentStatus}">${purchase.paymentStatus.toUpperCase()}</span></td>
+                        <td>${new Date(purchase.purchaseDate).toLocaleDateString()}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading purchases:', error);
+            }
+        }
+
+        // Auto-login for demo
+        window.onload = function() {
+            setTimeout(() => {
+                document.querySelector('button').click();
+            }, 1000);
+        };
+    </script>
+</body>
+</html>
